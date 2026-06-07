@@ -94,6 +94,13 @@ public interface TypedImpCastVisitor<T> extends ParseTreeVisitor<T> {
 	 */
 	T visitIfElse(TypedImpCastParser.IfElseContext ctx);
 	/**
+	 * Visit a parse tree produced by the {@code return}
+	 * labeled alternative in {@link TypedImpCastParser#com}.
+	 * @param ctx the parse tree
+	 * @return the visitor result
+	 */
+	T visitReturn(TypedImpCastParser.ReturnContext ctx);
+	/**
 	 * Visit a parse tree produced by the {@code seq}
 	 * labeled alternative in {@link TypedImpCastParser#com}.
 	 * @param ctx the parse tree
@@ -149,6 +156,13 @@ public interface TypedImpCastVisitor<T> extends ParseTreeVisitor<T> {
 	 * @return the visitor result
 	 */
 	T visitConcat(TypedImpCastParser.ConcatContext ctx);
+	/**
+	 * Visit a parse tree produced by the {@code funCall}
+	 * labeled alternative in {@link TypedImpCastParser#exp}.
+	 * @param ctx the parse tree
+	 * @return the visitor result
+	 */
+	T visitFunCall(TypedImpCastParser.FunCallContext ctx);
 	/**
 	 * Visit a parse tree produced by the {@code andOr}
 	 * labeled alternative in {@link TypedImpCastParser#exp}.
@@ -233,4 +247,34 @@ public interface TypedImpCastVisitor<T> extends ParseTreeVisitor<T> {
 	 * @return the visitor result
 	 */
 	T visitDecNum(TypedImpCastParser.DecNumContext ctx);
+	/**
+	 * Visit a parse tree produced by {@link TypedImpCastParser#funDecl}.
+	 * @param ctx the parse tree
+	 * @return the visitor result
+	 */
+	T visitFunDecl(TypedImpCastParser.FunDeclContext ctx);
+	/**
+	 * Visit a parse tree produced by {@link TypedImpCastParser#params}.
+	 * @param ctx the parse tree
+	 * @return the visitor result
+	 */
+	T visitParams(TypedImpCastParser.ParamsContext ctx);
+	/**
+	 * Visit a parse tree produced by {@link TypedImpCastParser#param}.
+	 * @param ctx the parse tree
+	 * @return the visitor result
+	 */
+	T visitParam(TypedImpCastParser.ParamContext ctx);
+	/**
+	 * Visit a parse tree produced by {@link TypedImpCastParser#paramMode}.
+	 * @param ctx the parse tree
+	 * @return the visitor result
+	 */
+	T visitParamMode(TypedImpCastParser.ParamModeContext ctx);
+	/**
+	 * Visit a parse tree produced by {@link TypedImpCastParser#args}.
+	 * @param ctx the parse tree
+	 * @return the visitor result
+	 */
+	T visitArgs(TypedImpCastParser.ArgsContext ctx);
 }

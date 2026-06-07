@@ -16,9 +16,3 @@ if (voto == 30 and lode) {
 } else {
     print "senza lode"
 }
-
-// OUTPUT ATTESO
-// studente: edoardo
-// voto: 27
-// esame superato
-// senza lode

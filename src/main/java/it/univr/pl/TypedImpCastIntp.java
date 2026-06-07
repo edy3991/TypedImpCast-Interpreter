@@ -8,10 +8,14 @@ import it.univr.pl.value.*;
 import org.apache.commons.text.StringEscapeUtils;
 import org.antlr.v4.runtime.CharStreams;
 import org.antlr.v4.runtime.CommonTokenStream;
+import java.util.HashMap;
+import java.util.Map;
 
 public class TypedImpCastIntp extends TypedImpCastBaseVisitor<Value> {
 
     private final Mem mem;
+
+    private final Map<String, TypedImpCastParser.FunDeclContext> functions = new HashMap<>();
 
     public TypedImpCastIntp(Mem mem) {
         this.mem = new Mem(mem);
@@ -47,11 +51,6 @@ public class TypedImpCastIntp extends TypedImpCastBaseVisitor<Value> {
 
     private double unwrapToDouble(NumValue<?> numValue) {
         return numValue.toJavaValue().doubleValue();
-    }
-
-    @Override
-    public ComValue visitMain(TypedImpCastParser.MainContext ctx) {
-        return visitCom(ctx.com());
     }
 
     @Override
@@ -428,4 +427,109 @@ public class TypedImpCastIntp extends TypedImpCastBaseVisitor<Value> {
         return visitExp(ctx.exp(2));
     }
 
+    @Override
+    public ComValue visitMain(TypedImpCastParser.MainContext ctx) {
+        for (TypedImpCastParser.FunDeclContext f : ctx.funDecl()) {
+            String name = f.ID().getText();
+
+            if (functions.containsKey(name)) {
+                throw new RuntimeException("Function " + name + " already declared.");
+            }
+
+            functions.put(name, f);
+        }
+        return visitCom(ctx.com());
+    }
+
+    private static class ReturnException extends RuntimeException {
+        private final ExpValue<?> value;
+
+        public ReturnException(ExpValue<?> value) {
+            this.value = value;
+        }
+
+        public ExpValue<?> getValue() {
+            return value;
+        }
+    }
+
+    @Override
+    public ComValue visitReturn(TypedImpCastParser.ReturnContext ctx) {
+        throw new ReturnException(visitExp(ctx.exp()));
+    }
+
+
+    @Override
+    public ExpValue<?> visitFunCall(TypedImpCastParser.FunCallContext ctx) {
+        String name = ctx.ID().getText();
+
+        if (!functions.containsKey(name)) {
+            throw new RuntimeException("Function " + name + " not declared.");
+        }
+
+        TypedImpCastParser.FunDeclContext fun = functions.get(name);
+
+        int expectedArgs = fun.params() == null ? 0 : fun.params().param().size();
+        int actualArgs = ctx.args() == null ? 0 : ctx.args().exp().size();
+
+        if (expectedArgs != actualArgs) {
+            throw new RuntimeException("Function " + name + " expects "
+                    + expectedArgs + " arguments but found " + actualArgs + ".");
+        }
+
+        ExpValue<?>[] argValues = new ExpValue<?>[actualArgs];
+        Map<String, String> refBindings = new HashMap<>();
+
+        // 1. Valuta gli argomenti PRIMA del nuovo scope
+        for (int i = 0; i < actualArgs; i++) {
+            argValues[i] = visitExp(ctx.args().exp(i));
+
+            TypedImpCastParser.ParamContext param = fun.params().param(i);
+
+            if (param.paramMode().REF() != null) {
+                TypedImpCastParser.ExpContext arg = ctx.args().exp(i);
+
+                if (!(arg instanceof TypedImpCastParser.IdContext)) {
+                    throw new RuntimeException("Reference parameter requires a variable.");
+                }
+
+                String paramName = param.ID().getText();
+                String originalName = ((TypedImpCastParser.IdContext) arg).ID().getText();
+
+                refBindings.put(paramName, originalName);
+            }
+        }
+
+        // 2. Ora crea lo scope della funzione
+        mem.enterScope();
+
+        try {
+            for (int i = 0; i < expectedArgs; i++) {
+                TypedImpCastParser.ParamContext param = fun.params().param(i);
+
+                String paramName = param.ID().getText();
+                ExpType paramType = TypeUtils.fromString(param.TYPE().getText());
+
+                mem.add(paramName, paramType);
+                mem.updateValue(paramName, argValues[i]);
+            }
+
+            visitCom(fun.com());
+
+            throw new RuntimeException("Function " + name + " ended without return.");
+
+        } catch (ReturnException re) {
+
+            for (String paramName : refBindings.keySet()) {
+                String originalName = refBindings.get(paramName);
+                ExpValue<?> finalValue = mem.getValue(paramName);
+                mem.updateValue(originalName, finalValue);
+            }
+
+            return re.getValue();
+
+        } finally {
+            mem.exitScope();
+        }
+    }
 }

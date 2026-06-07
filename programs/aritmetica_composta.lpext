@@ -18,11 +18,3 @@ string msg = "risultato = ";
 
 print msg : toStr(x)
 
-// OUTPUT ATTESO
-// somma:
-// 13
-// potenza:
-// 100
-// valore finale:
-// 26
-// risultato = 26

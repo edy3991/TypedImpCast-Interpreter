@@ -17,8 +17,3 @@ string esito =
     : "somma minore o uguale a 10";
 
 print esito
-
-// OUTPUT ATTESO
-// somma:
-// 15
-// somma maggiore di 10

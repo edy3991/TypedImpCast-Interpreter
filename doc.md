@@ -140,6 +140,89 @@ Il linguaggio supporta inoltre espressioni all’interno delle stringhe tramite 
 "Risultato: ${x + y}"
 ```
 
+## Funzioni
+
+TypedImpCastExt supporta la definizione e la chiamata di funzioni con parametri e valore di ritorno. Le funzioni sono dichiarate prima del blocco `main` in una sezione non eseguibile del programma.
+
+La sintassi generale è:
+
+```text
+fun TYPE nome(parametri) {
+    comandi
+}
+
+main {
+    comandi
+}
+```
+
+I parametri possono essere passati per valore oppure per riferimento:
+
+```text
+val TYPE x
+ref TYPE x
+```
+
+Il passaggio per valore crea una copia del valore passato alla funzione. Le modifiche al parametro formale non modificano la variabile originale.
+
+Il passaggio per riferimento permette invece alla funzione di modificare direttamente la variabile passata come argomento. Concettualmente è simile all’uso di un riferimento o puntatore: il parametro formale diventa collegato alla variabile originale.
+
+Esempio:
+
+```text
+fun int cambiav(val int x) {
+    x = 100;
+    return x
+}
+
+fun int cambiar(ref int x) {
+    x = 100;
+    return x
+}
+
+main {
+    int a = 5;
+    print toStr(cambiav(a));
+    print toStr(a);
+
+    int b = 9;
+    print toStr(cambiar(b));
+    print toStr(b)
+}
+```
+
+Output atteso:
+
+```text
+100
+5
+100
+100
+```
+
+Il linguaggio supporta anche funzioni ricorsive. Ad esempio:
+
+```text
+fun int fact(val int n) {
+    if (n == 0) {
+        return 1
+    } else {
+        return n * fact(n - 1)
+    }
+}
+
+main {
+    print toStr(fact(5))
+}
+```
+
+Output atteso:
+
+```text
+120
+```
+
+
 ## Limitazioni sintattiche
 
 Nella grammatica la sequenza di comandi è rappresentata tramite `com ; com`. Di conseguenza il punto e virgola separa due comandi, ma non è richiesto dopo l’ultimo comando del programma o di un blocco.
@@ -283,6 +366,131 @@ operatori di incremento e decremento
 assegnamenti composti
 operatore ternario
 interpolazione di espressioni nelle stringhe
+funzioni con parametri e valore di ritorno
+passaggio dei parametri per valore e per riferimento
+funzioni ricorsive
 ```
 
-Una difficoltà significativa è stata la gestione dello shadowing. Inizialmente la memoria e il type checker usavano una singola mappa globale. La soluzione adottata è stata sostituire questa struttura con una pila di ambienti, cercando le variabili dallo scope più interno verso quello più esterno.
+Una difficoltà significativa è stata la gestione dello shadowing. Inizialmente la memoria e il type checker utilizzavano una singola mappa globale per associare i nomi delle variabili ai rispettivi tipi o valori. Questa soluzione non permetteva di distinguere correttamente variabili con lo stesso nome dichiarate in scope diversi.
+
+La soluzione adottata è stata rappresentare gli ambienti tramite una pila di mappe. Ogni volta che l’interprete o il type checker entrano in un blocco, viene creato un nuovo ambiente; quando il blocco termina, l’ambiente viene rimosso. La ricerca di una variabile avviene partendo dallo scope più interno verso quello più esterno.
+
+Un’altra difficoltà ha riguardato l’interpolazione delle espressioni nelle stringhe. Per supportare stringhe come:
+
+```text
+"Risultato: ${x + y}"
+```
+
+l’interprete analizza il contenuto della stringa, individua le parti comprese tra `${` e `}`, le interpreta come espressioni del linguaggio e sostituisce il risultato all’interno della stringa finale.
+
+L’estensione più complessa è stata l’implementazione delle funzioni. Le funzioni non vengono eseguite nel momento in cui vengono dichiarate, ma vengono salvate in una mappa globale che associa il nome della funzione al nodo del parse tree corrispondente alla sua dichiarazione.
+
+Quando viene incontrata una chiamata di funzione, l’interprete recupera la definizione dalla mappa, valuta gli argomenti, crea un nuovo ambiente per la chiamata e associa i parametri formali ai valori ricevuti. Questo meccanismo permette anche la ricorsione, perché ogni chiamata ricorsiva crea un nuovo ambiente indipendente.
+
+Il comando `return` è stato implementato tramite un’eccezione interna. Quando l’interprete incontra un `return`, lancia un’eccezione contenente il valore restituito. In questo modo l’esecuzione del corpo della funzione viene interrotta immediatamente e il valore viene riportato al punto della chiamata.
+
+Per il passaggio per riferimento, l’interprete mantiene un collegamento tra il parametro formale e la variabile originale passata come argomento. Alla fine della chiamata, il valore finale del parametro viene copiato nella variabile originale. In questo modo una funzione può modificare una variabile dichiarata dal chiamante.
+
+$$
+\text{Seq}\;
+\frac{
+(\sigma, com_1) \rightarrow (\sigma', com_1')
+}{
+(\sigma, com_1 ; com_2) \rightarrow (\sigma', com_1' ; com_2)
+}
+$$
+
+$$
+\text{FunCall}\;
+\frac{
+f \mapsto (params, body, ret) \quad
+\sigma' = bind(params, args, \sigma)
+}{
+(\sigma, f(args)) \rightarrow eval(body, \sigma')
+}
+$$
+
+# Programmi di Test
+
+## Test 1 — Scope e Shadowing
+
+File: `scope_shadowing.lpext`
+
+Mostra `if-else`, scope locale e shadowing.
+
+Output atteso:
+
+```text
+valore iniziale:
+10
+x interna:
+100
+x esterna:
+10
+```
+
+## Test 2 — Aritmetica e Calcoli
+
+File: `aritmetica_composta.lpext`
+
+Calcoli aritmetici di base e calcoli composti.
+
+Output atteso:
+```text
+somma:
+13
+potenza:
+100
+valore finale:
+26
+risultato = 26
+```
+## Test 3 — While e zucchero sintattico
+
+File: `while_ternario.lpext`
+
+Esecuzione di un while +  exp ? exp : exp
+
+Output atteso:
+```text
+somma:
+15
+somma maggiore di 10
+```
+
+## Test 4 — Programma completo
+
+File: `programma_completo.lpext`
+
+Un esempio di un programma completo
+
+Output atteso:
+```text
+studente: edoardo
+voto: 27
+esame superato
+senza lode
+```
+## Test 5 — Passaggio per valore e riferimento
+
+File: `fun_v_r.lpext`
+
+Delle funzioni di base che usano i parametri attuali o come riferimento o come valori
+
+Output atteso:
+```text
+100
+5
+100
+100
+```
+## Test 6 — Funzione ricorsiva
+
+File: `fact.lpext`
+
+Classica funzione ricorsiva con i fattoriali
+
+Output atteso:
+```text
+120
+```

@@ -14,6 +14,10 @@ public class TypedImpCastTS extends TypedImpCastBaseVisitor<Type> {
 
     private final List<Map<String, ExpType>> env = new ArrayList<>();
 
+    private final Map<String, TypedImpCastParser.FunDeclContext> functions = new HashMap<>();
+
+    private ExpType currentReturnType = null;
+
     public TypedImpCastTS() {
         env.add(new HashMap<>());
     }
@@ -77,11 +81,6 @@ public class TypedImpCastTS extends TypedImpCastBaseVisitor<Type> {
 
     private boolean tryToUpcast(ExpType typeA, ExpType typeB) {
         return typeA == typeB || typeA.isCompatible(typeB) || typeB.isCompatible(typeA);
-    }
-
-    @Override
-    public ComType visitMain(TypedImpCastParser.MainContext ctx) {
-        return visitCom(ctx.com());
     }
 
     @Override
@@ -452,5 +451,114 @@ public class TypedImpCastTS extends TypedImpCastBaseVisitor<Type> {
         }
 
         return trueType.isCompatible(falseType) ? trueType : falseType;
+    }
+
+    @Override
+    public ComType visitMain(TypedImpCastParser.MainContext ctx) {
+        for (TypedImpCastParser.FunDeclContext f : ctx.funDecl()) {
+            String name = f.ID().getText();
+
+            if (functions.containsKey(name)) {
+                throw new RuntimeException("Function " + name + " already declared.");
+            }
+
+            functions.put(name, f);
+        }
+
+        for (TypedImpCastParser.FunDeclContext f : ctx.funDecl()) {
+            visitFunDecl(f);
+        }
+
+        currentReturnType = null;
+        return visitCom(ctx.com());
+    }
+
+    @Override
+    public Type visitFunDecl(TypedImpCastParser.FunDeclContext ctx) {
+        ExpType oldReturnType = currentReturnType;
+
+        currentReturnType = TypeUtils.fromString(ctx.TYPE().getText());
+
+        enterScope();
+
+        if (ctx.params() != null) {
+            for (TypedImpCastParser.ParamContext p : ctx.params().param()) {
+                ExpType paramType = TypeUtils.fromString(p.TYPE().getText());
+                String paramName = p.ID().getText();
+
+                Map<String, ExpType> current = env.get(env.size() - 1);
+
+                if (current.containsKey(paramName)) {
+                    throw new VarDeclarationException("Variable " + paramName + " already declared.");
+                }
+
+                current.put(paramName, paramType);
+            }
+        }
+
+        visitCom(ctx.com());
+
+        exitScope();
+
+        currentReturnType = oldReturnType;
+
+        return ComType.INSTANCE;
+    }
+
+
+    @Override
+    public ComType visitReturn(TypedImpCastParser.ReturnContext ctx) {
+        if (currentReturnType == null) {
+            throw new RuntimeException("Return outside function.");
+        }
+
+        ExpType actualType = (ExpType) visit(ctx.exp());
+
+        if (!currentReturnType.isCompatible(actualType)) {
+            throw new RuntimeException("Invalid return type. Expected "
+                    + currentReturnType + " but found " + actualType + ".");
+        }
+
+        return ComType.INSTANCE;
+    }
+
+    @Override
+    public ExpType visitFunCall(TypedImpCastParser.FunCallContext ctx) {
+        String name = ctx.ID().getText();
+
+        if (!functions.containsKey(name)) {
+            throw new RuntimeException("Function " + name + " not declared.");
+        }
+
+        TypedImpCastParser.FunDeclContext fun = functions.get(name);
+
+        int expectedArgs = fun.params() == null ? 0 : fun.params().param().size();
+        int actualArgs = ctx.args() == null ? 0 : ctx.args().exp().size();
+
+        if (expectedArgs != actualArgs) {
+            throw new RuntimeException("Function " + name + " expects "
+                    + expectedArgs + " arguments but found " + actualArgs + ".");
+        }
+
+        for (int i = 0; i < expectedArgs; i++) {
+            TypedImpCastParser.ParamContext param = fun.params().param(i);
+
+            ExpType expectedType = TypeUtils.fromString(param.TYPE().getText());
+            ExpType actualType = (ExpType) visit(ctx.args().exp(i));
+
+            if (!actualType.equals(expectedType)) {
+                throw new RuntimeException("Invalid argument type in function "
+                        + name + ". Expected " + expectedType
+                        + " but found " + actualType + ".");
+            }
+
+            if (param.paramMode().REF() != null) {
+                if (!(ctx.args().exp(i) instanceof TypedImpCastParser.IdContext)) {
+                    throw new RuntimeException("Reference parameter requires a variable.");
+                }
+            }
+        }
+
+        return TypeUtils.fromString(fun.TYPE().getText());
     }
 }

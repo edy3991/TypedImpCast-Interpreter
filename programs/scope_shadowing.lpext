@@ -18,11 +18,3 @@ if (x > 5) {
 
 print "x esterna:";
 print toStr(x)
-
-// OUTPUT ATTESO
-//valore iniziale:
-//10
-//x interna:
-//100
-//x esterna:
-//10

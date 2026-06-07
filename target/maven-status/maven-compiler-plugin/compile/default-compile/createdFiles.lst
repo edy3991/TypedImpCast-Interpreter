@@ -1,5 +1,7 @@
 it/univr/pl/Mem.class
 it/univr/pl/TypedImpCastParser$SeqContext.class
+it/univr/pl/TypedImpCastParser$ReturnContext.class
+it/univr/pl/TypedImpCastParser$ParamContext.class
 it/univr/pl/TypedImpCastParser$CastContext.class
 it/univr/pl/TypedImpCastBaseVisitor.class
 it/univr/pl/type/SimpleType.class
@@ -8,6 +10,7 @@ it/univr/pl/type/TypeUtils.class
 it/univr/pl/TypedImpCastParser$ExpContext.class
 it/univr/pl/TypedImpCastParser$AndOrContext.class
 it/univr/pl/value/BoolValue.class
+it/univr/pl/TypedImpCastParser$ArgsContext.class
 it/univr/pl/TypedImpCastParser$TostrContext.class
 it/univr/pl/TypedImpCastParser$PowContext.class
 it/univr/pl/TypedImpCastParser$NumericContext.class
@@ -16,10 +19,13 @@ it/univr/pl/TypedImpCastParser$OutContext.class
 it/univr/pl/TypedImpCastParser$AddSubContext.class
 it/univr/pl/TypedImpCastParser.class
 it/univr/pl/value/StringValue.class
+it/univr/pl/TypedImpCastParser$ParamModeContext.class
 it/univr/pl/TypedImpCastParser$CmpExpContext.class
 it/univr/pl/TypedImpCastIntp.class
 it/univr/pl/TypedImpCastParser$ParExpContext.class
 it/univr/pl/value/ComValue.class
+it/univr/pl/TypedImpCastParser$ParamsContext.class
+it/univr/pl/TypedImpCastParser$FunDeclContext.class
 it/univr/pl/exception/TypeMismatchException.class
 it/univr/pl/TypedImpCastParser$NotContext.class
 it/univr/pl/TypedImpCastParser$CompAssignContext.class
@@ -27,6 +33,7 @@ it/univr/pl/exception/VarDeclarationException.class
 it/univr/pl/TypedImpCastParser$PostIncContext.class
 it/univr/pl/TypedImpCastParser$IntNumContext.class
 it/univr/pl/TypedImpCastParser$PreDecrContext.class
+it/univr/pl/TypedImpCastIntp$ReturnException.class
 it/univr/pl/type/ComType.class
 it/univr/pl/TypedImpCastParser$EqExpContext.class
 it/univr/pl/type/Type.class
@@ -35,6 +42,7 @@ it/univr/pl/TypedImpCastParser$PreIncContext.class
 it/univr/pl/TypedImpCastParser$NopContext.class
 it/univr/pl/TypedImpCastLexer.class
 it/univr/pl/MainTypedImpCast.class
+it/univr/pl/TypedImpCastParser$FunCallContext.class
 it/univr/pl/value/Value.class
 it/univr/pl/value/DecValue.class
 it/univr/pl/value/NumValue.class

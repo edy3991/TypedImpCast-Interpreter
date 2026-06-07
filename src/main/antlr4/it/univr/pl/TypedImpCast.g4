@@ -1,7 +1,7 @@
 grammar TypedImpCast;
 
 
-main : com EOF ;
+main : funDecl* MAIN LBRACE com RBRACE EOF;
 
 com : TYPE ID (ASSIGN exp)?                                        # decl
     | ID ASSIGN exp                                                # assign
@@ -16,11 +16,13 @@ com : TYPE ID (ASSIGN exp)?                                        # decl
     | com SEMICOLON com                                            # seq
     | OUT exp                                                      # out
     | NOP                                                          # nop
+    | RETURN exp # return
     ;
 
 exp : num                                 # numeric
     | BOOL                                # boolean
     | STRING                              # string
+    | ID LPAR args? RPAR                  # funCall
     | ID                                  # id
     | <assoc=right> exp POW exp           # pow
     | TOSTR LPAR exp RPAR                 # tostr
@@ -39,6 +41,19 @@ exp : num                                 # numeric
 num : INT     # intNum
     | DEC     # decNum
     ;
+
+funDecl : FUN TYPE ID LPAR params? RPAR LBRACE com RBRACE ;
+params : param (COMMA param)* ;
+param : paramMode TYPE ID ;
+paramMode : VAL | REF ;
+args : exp (COMMA exp)* ;
+
+FUN : 'fun' ;
+MAIN : 'main' ;
+RETURN : 'return' ;
+VAL : 'val' ;
+REF : 'ref' ;
+COMMA : ',' ;
 
 ADD_ASSIGN : '+=' ;
 SUB_ASSIGN : '-=' ;

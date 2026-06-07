@@ -5,21 +5,37 @@ import it.univr.pl.exception.VarDeclarationException;
 import it.univr.pl.type.*;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.ArrayList;
+import java.util.List;
+import org.antlr.v4.runtime.CharStreams;
+import org.antlr.v4.runtime.CommonTokenStream;
 
 public class TypedImpCastTS extends TypedImpCastBaseVisitor<Type> {
 
-    private final Map<String, ExpType> typeMap;
-
-    public TypedImpCastTS(Map<String, ExpType> typeMap) {
-        this.typeMap = new HashMap<>(typeMap);
-    }
+    private final List<Map<String, ExpType>> env = new ArrayList<>();
 
     public TypedImpCastTS() {
-        typeMap = new HashMap<>();
+        env.add(new HashMap<>());
+    }
+
+    private void enterScope() {
+        env.add(new HashMap<>());
+    }
+
+    private void exitScope() {
+        env.remove(env.size() - 1);
+    }
+
+    private ExpType lookup(String id) {
+        for (int i = env.size() - 1; i >= 0; i--) {
+            if (env.get(i).containsKey(id))
+                return env.get(i).get(id);
+        }
+        throw new VarDeclarationException("Variable " + id + " not declared.");
     }
 
     public Map<String, ExpType> getTypeMap() {
-        return typeMap;
+        return env.get(0);
     }
 
     private ComType visitCom(TypedImpCastParser.ComContext ctx) {
@@ -73,12 +89,14 @@ public class TypedImpCastTS extends TypedImpCastBaseVisitor<Type> {
 
         ExpType varType = TypeUtils.fromString(ctx.TYPE().getText());
         String id = ctx.ID().getText();
-        if (typeMap.containsKey(id)) { // already declared variable
-            String err = "Variable " + id + " already declared.\n" +
-                         "@" + ctx.start.getLine() + ":" + ctx.start.getCharPositionInLine() + "\n";
-            throw new VarDeclarationException(err);
+        //
+        Map<String, ExpType> current = env.get(env.size() - 1);
+
+        if (current.containsKey(id)) {
+            throw new VarDeclarationException("Variable " + id + " already declared.");
         }
-        typeMap.put(id, varType);
+        current.put(id, varType);
+        //
         if (ctx.exp() != null) {
             ExpType expType = (ExpType) visit(ctx.exp());
             assert varType != null; // always true
@@ -95,53 +113,57 @@ public class TypedImpCastTS extends TypedImpCastBaseVisitor<Type> {
     @Override
     public ComType visitWhile(TypedImpCastParser.WhileContext ctx) {
         visitBoolExp(ctx.exp());
+        //
+        enterScope();
+        visitCom(ctx.com());
+        exitScope();
 
-        TypedImpCastTS typeSystem = new TypedImpCastTS(typeMap);
-
-        return typeSystem.visitCom(ctx.com());
+        return ComType.INSTANCE;
+        //
     }
 
     @Override
     public ComType visitIf(TypedImpCastParser.IfContext ctx) {
         visitBoolExp(ctx.exp());
-
-        TypedImpCastTS typeSystem = new TypedImpCastTS(typeMap);
-
-        return typeSystem.visitCom(ctx.com());
+        //
+        enterScope();
+        visitCom(ctx.com());
+        exitScope();
+        //
+        return ComType.INSTANCE;
     }
 
     @Override
     public ComType visitIfElse(TypedImpCastParser.IfElseContext ctx) {
         visitBoolExp(ctx.exp());
+        //
+        enterScope();
+        visitCom(ctx.com(0));
+        exitScope();
 
-        TypedImpCastTS typeSystem = new TypedImpCastTS(typeMap);
-        typeSystem.visitCom(ctx.com(0));
-
-        typeSystem = new TypedImpCastTS(typeMap);
-
-        return typeSystem.visitCom(ctx.com(1));
+        enterScope();
+        visitCom(ctx.com(1));
+        exitScope();
+        //
+        return ComType.INSTANCE;
     }
 
     @Override
     public ComType visitAssign(TypedImpCastParser.AssignContext ctx) {
 
         String id = ctx.ID().getText();
-
-        if (!typeMap.containsKey(id)) { // assignment to not declared variable
-            String err = "Variable " + id + " assigned but never declared.\n" +
-                         "@" + ctx.start.getLine() + ":" + ctx.start.getCharPositionInLine();
-            throw new VarDeclarationException(err);
-        }
-
-        ExpType varType = typeMap.get(id);
+        //
+        ExpType varType = lookup(id);
         ExpType expType = (ExpType) visit(ctx.exp());
-        if (!varType.isCompatible(expType)) { // type mismatch
-            String err = "Variable " + id + " cannot be assigned with " + expType.getName() + ".\n"+
-                         "@" + ctx.start.getLine() + ":" + ctx.start.getCharPositionInLine() + "\n";
-            throw new TypeMismatchException(err);
+
+        if (!varType.isCompatible(expType)) {
+            throw new TypeMismatchException(
+                    "Variable " + id + " cannot be assigned with " + expType.getName() + "."
+            );
         }
 
         return ComType.INSTANCE;
+        //
     }
 
     @Override
@@ -150,17 +172,8 @@ public class TypedImpCastTS extends TypedImpCastBaseVisitor<Type> {
         return visitCom(ctx.com(1));
     }
 
-    @Override
-    public ExpType visitId(TypedImpCastParser.IdContext ctx) {
-        String id = ctx.ID().getText();
-        if (!typeMap.containsKey(id)) { // not declared variable
-            String err = "Variable " + id + " not declared.\n" +
-                         "@" + ctx.start.getLine() + ":" + ctx.start.getCharPositionInLine() + "\n";
-            throw new VarDeclarationException(err);
-        }
-
-        return typeMap.get(id);
-    }
+    @Override //
+    public ExpType visitId(TypedImpCastParser.IdContext ctx) { return lookup(ctx.ID().getText()); }
 
     @Override
     public ComType visitOut(TypedImpCastParser.OutContext ctx) {
@@ -198,8 +211,52 @@ public class TypedImpCastTS extends TypedImpCastBaseVisitor<Type> {
 
     @Override
     public SimpleType visitString(TypedImpCastParser.StringContext ctx) {
+        String raw = ctx.STRING().getText();
+        String str = raw.substring(1, raw.length() - 1);
+
+        checkInterpolations(str);
+
         return SimpleType.STRING;
     }
+
+    private void checkInterpolations(String str) {
+        int i = 0;
+
+        while (i < str.length()) {
+            int start = str.indexOf("${", i);
+
+            if (start == -1) {
+                break;
+            }
+
+            int end = str.indexOf("}", start);
+
+            if (end == -1) {
+                throw new TypeMismatchException("Invalid string interpolation: missing }.");
+            }
+
+            String expText = str.substring(start + 2, end);
+
+            checkExpressionFromString(expText);
+
+            i = end + 1;
+        }
+    }
+
+    private void checkExpressionFromString(String expText) {
+        TypedImpCastLexer lexer = new TypedImpCastLexer(
+                CharStreams.fromString(expText)
+        );
+
+        CommonTokenStream tokens = new CommonTokenStream(lexer);
+        TypedImpCastParser parser = new TypedImpCastParser(tokens);
+
+        TypedImpCastParser.ExpContext expCtx = parser.exp();
+
+        visit(expCtx);
+    }
+
+
 
     @Override
     public SimpleType visitNumeric(TypedImpCastParser.NumericContext ctx) {
@@ -318,5 +375,82 @@ public class TypedImpCastTS extends TypedImpCastBaseVisitor<Type> {
         }
 
         return base.isCompatible(exponent) ? base : exponent;
+    }
+
+    @Override
+    public ComType visitPostInc(TypedImpCastParser.PostIncContext ctx) {
+        ExpType type = lookup(ctx.ID().getText());
+
+        if(!type.isCompatible(SimpleType.INT) && !type.isCompatible(SimpleType.DEC)) {
+            throw new TypeMismatchException("Type mismatch: requires int variable.");
+        }
+
+        return ComType.INSTANCE;
+    }
+
+    @Override
+    public ComType visitPreInc(TypedImpCastParser.PreIncContext ctx) {
+        ExpType type = lookup(ctx.ID().getText());
+
+        if(!type.isCompatible(SimpleType.INT) && !type.isCompatible(SimpleType.DEC)) {
+            throw new TypeMismatchException("Type mismatch: requires int variable.");
+        }
+
+        return ComType.INSTANCE;
+    }
+
+    @Override
+    public ComType visitPostDecr(TypedImpCastParser.PostDecrContext ctx) {
+        ExpType type = lookup(ctx.ID().getText());
+
+        if(!type.isCompatible(SimpleType.INT) && !type.isCompatible(SimpleType.DEC)) {
+            throw new TypeMismatchException("Type mismatch: requires int variable.");
+        }
+
+        return ComType.INSTANCE;
+    }
+
+    @Override
+    public ComType visitPreDecr(TypedImpCastParser.PreDecrContext ctx) {
+        ExpType type = lookup(ctx.ID().getText());
+
+        if(!type.isCompatible(SimpleType.INT) && !type.isCompatible(SimpleType.DEC)) {
+            throw new TypeMismatchException("Type mismatch: requires int variable.");
+        }
+
+        return ComType.INSTANCE;
+    }
+
+    @Override
+    public ComType visitCompAssign(TypedImpCastParser.CompAssignContext ctx) {
+        String id = ctx.ID().getText();
+
+        ExpType varType = lookup(ctx.ID().getText());
+        ExpType expType = (ExpType) visit(ctx.exp());
+
+        if ((!varType.isCompatible(SimpleType.INT) && !varType.isCompatible(SimpleType.DEC)) ||
+                (!expType.isCompatible(SimpleType.INT) && !expType.isCompatible(SimpleType.DEC))) {
+            throw new TypeMismatchException("Compound assignment requires numeric operands.");
+        }
+
+        if (!varType.isCompatible(expType)) {
+            throw new TypeMismatchException("Compound assignment result is not compatible with variable type.");
+        }
+
+        return ComType.INSTANCE;
+    }
+
+    @Override
+    public ExpType visitTernary(TypedImpCastParser.TernaryContext ctx) {
+        visitBoolExp(ctx.exp(0));
+
+        ExpType trueType = (ExpType) visit(ctx.exp(1));
+        ExpType falseType = (ExpType) visit(ctx.exp(2));
+
+        if (!tryToUpcast(trueType, falseType)) {
+            throw new TypeMismatchException("Type mismatch: ternary branches have incompatible types.");
+        }
+
+        return trueType.isCompatible(falseType) ? trueType : falseType;
     }
 }

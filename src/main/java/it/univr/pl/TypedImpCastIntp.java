@@ -1,10 +1,13 @@
 package it.univr.pl;
 
+import it.univr.pl.type.ComType;
 import it.univr.pl.type.ExpType;
 import it.univr.pl.type.SimpleType;
 import it.univr.pl.type.TypeUtils;
 import it.univr.pl.value.*;
 import org.apache.commons.text.StringEscapeUtils;
+import org.antlr.v4.runtime.CharStreams;
+import org.antlr.v4.runtime.CommonTokenStream;
 
 public class TypedImpCastIntp extends TypedImpCastBaseVisitor<Value> {
 
@@ -69,24 +72,29 @@ public class TypedImpCastIntp extends TypedImpCastBaseVisitor<Value> {
     public ComValue visitIf(TypedImpCastParser.IfContext ctx) {
         if (!visitBoolExp(ctx.exp()).toJavaValue())
             return ComValue.INSTANCE;
-
-        TypedImpCastIntp interpreter = new TypedImpCastIntp(mem);
-        interpreter.visitCom(ctx.com());
-        mem.updateValues(interpreter.getMem());
-
+        //
+        mem.enterScope();
+        visitCom(ctx.com());
+        mem.exitScope();
+        //
         return ComValue.INSTANCE;
     }
 
     @Override
     public ComValue visitIfElse(TypedImpCastParser.IfElseContext ctx) {
-        TypedImpCastIntp interpreter = new TypedImpCastIntp(mem);
-        if (visitBoolExp(ctx.exp()).toJavaValue())
-            interpreter.visitCom(ctx.com(0));
-        else
-            interpreter.visitCom(ctx.com(1));
-        mem.updateValues(interpreter.getMem());
+        //
+        if (visitBoolExp(ctx.exp()).toJavaValue()) {
+            mem.enterScope();
+            visitCom(ctx.com(0));
+            mem.exitScope();
+        } else {
+            mem.enterScope();
+            visitCom(ctx.com(1));
+            mem.exitScope();
+        }
 
         return ComValue.INSTANCE;
+        //
     }
 
     @Override
@@ -107,14 +115,15 @@ public class TypedImpCastIntp extends TypedImpCastBaseVisitor<Value> {
 
     @Override
     public ComValue visitWhile(TypedImpCastParser.WhileContext ctx) {
-        if (!visitBoolExp(ctx.exp()).toJavaValue())
-            return ComValue.INSTANCE;
+        //
+        while (visitBoolExp(ctx.exp()).toJavaValue()) {
+            mem.enterScope();
+            visitCom(ctx.com());
+            mem.exitScope();
+        }
 
-        TypedImpCastIntp interpreter = new TypedImpCastIntp(mem);
-        interpreter.visitCom(ctx.com());
-        mem.updateValues(interpreter.getMem());
-
-        return visitWhile(ctx);
+        return ComValue.INSTANCE;
+        //
     }
 
     @Override
@@ -145,8 +154,62 @@ public class TypedImpCastIntp extends TypedImpCastBaseVisitor<Value> {
 
     @Override
     public StringValue visitString(TypedImpCastParser.StringContext ctx) {
-        String str = ctx.STRING().getText().substring(1, ctx.STRING().getText().length() - 1);
-        return new StringValue(StringEscapeUtils.unescapeJava(str));
+        String raw = ctx.STRING().getText();
+
+        //toglie le virgolette iniziali e finali
+        String str = raw.substring(1, raw.length() - 1);
+
+        str = StringEscapeUtils.unescapeJava(str);
+
+        String result = interpolate(str);
+
+        return new StringValue(result);
+    }
+
+    private String interpolate(String str) {
+        StringBuilder result = new StringBuilder();
+
+        int i = 0;
+
+        while (i < str.length()) {
+            int start = str.indexOf("${", i);
+
+            if (start == -1) {
+                result.append(str.substring(i));
+                break;
+            }
+
+            result.append(str, i, start);
+
+            int end = str.indexOf("}", start);
+
+            if (end == -1) {
+                throw new RuntimeException("Invalid string interpolation: missing }.");
+            }
+
+            String expText = str.substring(start + 2, end);
+
+            ExpValue<?> value = evalExpressionFromString(expText);
+
+            result.append(value.toString());
+
+            i = end + 1;
+        }
+
+        return result.toString();
+    }
+
+    private ExpValue<?> evalExpressionFromString(String expText) {
+        TypedImpCastLexer lexer = new TypedImpCastLexer(
+                CharStreams.fromString(expText)
+        );
+
+        CommonTokenStream tokens = new CommonTokenStream(lexer);
+        TypedImpCastParser parser = new TypedImpCastParser(tokens);
+
+        TypedImpCastParser.ExpContext expCtx = parser.exp();
+
+        return visitExp(expCtx);
     }
 
     @Override
@@ -278,6 +341,91 @@ public class TypedImpCastIntp extends TypedImpCastBaseVisitor<Value> {
         StringValue right = visitStringExp(ctx.exp(1));
 
         return new StringValue(left.toJavaValue() + right.toJavaValue());
+    }
+
+    @Override
+    public ComValue visitPostInc(TypedImpCastParser.PostIncContext ctx) {
+        String id = ctx.ID().getText();
+
+        IntValue oldValue =  (IntValue) mem.getValue(id);
+        mem.updateValue(id, new IntValue(oldValue.toJavaValue() + 1));
+
+        return ComValue.INSTANCE;
+    }
+
+    @Override
+    public ComValue visitPreInc(TypedImpCastParser.PreIncContext ctx) {
+        String id = ctx.ID().getText();
+
+        IntValue oldValue =  (IntValue) mem.getValue(id);
+        mem.updateValue(id, new IntValue(oldValue.toJavaValue() + 1));
+
+        return ComValue.INSTANCE;
+    }
+
+    @Override
+    public ComValue visitPreDecr(TypedImpCastParser.PreDecrContext ctx) {
+        String id = ctx.ID().getText();
+        IntValue oldValue =  (IntValue) mem.getValue(id);
+
+        mem.updateValue(id, new IntValue(oldValue.toJavaValue() - 1));
+
+        return ComValue.INSTANCE;
+    }
+
+    @Override
+    public ComValue visitPostDecr(TypedImpCastParser.PostDecrContext ctx) {
+        String id = ctx.ID().getText();
+        IntValue oldValue =  (IntValue) mem.getValue(id);
+
+        mem.updateValue(id, new IntValue(oldValue.toJavaValue() - 1));
+
+        return ComValue.INSTANCE;
+    }
+
+    @Override
+    public ComValue visitCompAssign(TypedImpCastParser.CompAssignContext ctx) {
+        String id = ctx.ID().getText();
+
+        NumValue<?> left = (NumValue<?>) mem.getValue(id);
+        NumValue<?> right = visitNumExp(ctx.exp());
+
+        double result;
+
+        switch (ctx.op.getType()) {
+            case TypedImpCastParser.ADD_ASSIGN ->
+                    result = left.toJavaValue().doubleValue() + right.toJavaValue().doubleValue();
+
+            case TypedImpCastParser.SUB_ASSIGN ->
+                    result = left.toJavaValue().doubleValue() - right.toJavaValue().doubleValue();
+
+            case TypedImpCastParser.MUL_ASSIGN ->
+                    result = left.toJavaValue().doubleValue() * right.toJavaValue().doubleValue();
+
+            case TypedImpCastParser.DIV_ASSIGN ->
+                    result = left.toJavaValue().doubleValue() / right.toJavaValue().doubleValue();
+
+            default -> throw new RuntimeException("Unknown compound assignment operator.");
+        }
+
+        if (left instanceof IntValue && right instanceof IntValue && ctx.op.getType() != TypedImpCastParser.DIV_ASSIGN) {
+            mem.updateValue(id, new IntValue((int) result));
+        } else {
+            mem.updateValue(id, new DecValue(result));
+        }
+
+        return ComValue.INSTANCE;
+    }
+
+    @Override
+    public ExpValue<?> visitTernary(TypedImpCastParser.TernaryContext ctx) {
+        BoolValue condition = visitBoolExp(ctx.exp(0));
+
+        if(condition.toJavaValue()) {
+            return visitExp(ctx.exp(1));
+        }
+
+        return visitExp(ctx.exp(2));
     }
 
 }

@@ -5,62 +5,104 @@ import it.univr.pl.type.TypeUtils;
 import it.univr.pl.value.*;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.ArrayList;
+import java.util.List;
 
 public class Mem {
 
-    private final Map<String, ExpValue<?>> values;
-    private final Map<String, ExpType> types;
+    private final List<Map<String, ExpValue<?>>> valuesEnv;
+    private final List<Map<String, ExpType>> typesEnv;
 
     public Mem() {
-        values = new HashMap<>();
-        types = new HashMap<>();
+        valuesEnv = new ArrayList<>();
+        typesEnv = new ArrayList<>();
+
+        valuesEnv.add(new HashMap<>());
+        typesEnv.add(new HashMap<>());
     }
 
     public Mem(Mem mem) {
-        values = new HashMap<>(mem.values);
-        types = new HashMap<>(mem.types);
+        valuesEnv = new ArrayList<>();
+        typesEnv = new ArrayList<>();
+
+        for (Map<String, ExpValue<?>> m : mem.valuesEnv)
+            valuesEnv.add(new HashMap<>(m));
+
+        for (Map<String, ExpType> m : mem.typesEnv)
+            typesEnv.add(new HashMap<>(m));
+    }
+
+    public void enterScope() {
+        valuesEnv.add(new HashMap<>());
+        typesEnv.add(new HashMap<>());
+    }
+
+    public void exitScope() {
+        valuesEnv.remove(valuesEnv.size() - 1);
+        typesEnv.remove(typesEnv.size() - 1);
     }
 
     public boolean contains(String id) {
-        return values.containsKey(id) && values.get(id) != null;
+        return getValue(id) != null;
     }
 
     public ExpValue<?> getValue(String id) {
-        return values.get(id);
+        for (int i = valuesEnv.size() - 1; i >= 0; i--) {
+            if (valuesEnv.get(i).containsKey(id)) {
+                return valuesEnv.get(i).get(id);
+            }
+        }
+        return null;
     }
 
     public ExpType getType(String id) {
-        return types.get(id);
+        for (int i = typesEnv.size() - 1; i >= 0; i--) {
+            if (typesEnv.get(i).containsKey(id)) {
+                return typesEnv.get(i).get(id);
+            }
+        }
+        return null;
     }
 
     public void updateValue(String id, ExpValue<?> value) {
-        values.put(id, value);
+        for (int i = valuesEnv.size() - 1; i >= 0; i--) {
+            if (valuesEnv.get(i).containsKey(id)) {
+                valuesEnv.get(i).put(id, value);
+                return;
+            }
+        }
+        throw new RuntimeException("Variable " + id + " not declared.");
     }
 
     public void add(String id, ExpValue<?> value) {
-        values.put(id, value);
-        types.put(id, TypeUtils.fromValue(value));
+        Map<String, ExpValue<?>> currentValues = valuesEnv.get(valuesEnv.size() - 1);
+        Map<String, ExpType> currentTypes = typesEnv.get(typesEnv.size() - 1);
+
+        currentValues.put(id, value);
+        currentTypes.put(id, TypeUtils.fromValue(value));
     }
 
     public void add(String id, ExpType type) {
-        values.put(id, null);
-        types.put(id, type);
+        Map<String, ExpValue<?>> currentValues = valuesEnv.get(valuesEnv.size() - 1);
+        Map<String, ExpType> currentTypes = typesEnv.get(typesEnv.size() - 1);
+
+        currentValues.put(id, null);
+        currentTypes.put(id, type);
     }
 
-    public void updateValues(Mem other) {
-        for (String idOther : other.values.keySet())
-            for (String id : values.keySet())
-                if (idOther.equals(id))
-                    updateValue(id, other.values.get(idOther));
-    }
+    //public void updateValues(Mem other) {   }
 
     @Override
     public String toString() {
+
         StringBuilder sb = new StringBuilder();
-        sb.append("{ ");
-        for (String var : values.keySet())
-            sb.append(var).append("[").append(types.get(var).getName()).append("]:").append(values.get(var)).append(" ");
-        sb.append("}");
+
+        for (int i = 0; i < valuesEnv.size(); i++) {
+            sb.append("Scope ").append(i).append(": ");
+            sb.append(valuesEnv.get(i));
+            sb.append("\n");
+        }
+
         return sb.toString();
     }
 }

@@ -8,6 +8,11 @@ main : com EOF ;
 
 com : TYPE ID (ASSIGN exp)?                                        # decl
     | ID ASSIGN exp                                                # assign
+    | ID INC                                                       # postInc
+    | INC ID                                                       # preInc
+    | ID DECR                                                      # postDecr
+    | DECR ID                                                      # preDecr
+   | ID op=(ADD_ASSIGN | SUB_ASSIGN | MUL_ASSIGN | DIV_ASSIGN) exp # compAssign
     | IF LPAR exp RPAR LBRACE com RBRACE                           # if
     | IF LPAR exp RPAR LBRACE com RBRACE ELSE LBRACE com RBRACE    # ifElse
     | WHILE LPAR exp RPAR LBRACE com RBRACE                        # while
@@ -27,6 +32,7 @@ exp : num                                 # numeric
     | exp op=(LT | LEQ | GEQ | GT) exp    # cmpExp
     | exp op=(EQQ | NEQ) exp              # eqExp
     | exp op=(AND | OR) exp               # andOr
+    | <assoc=right> exp QUESTION exp CONCAT exp          # ternary
     | exp CONCAT exp                      # concat
     | NOT exp                             # not
     | LPAR exp RPAR                       # parExp
@@ -37,7 +43,14 @@ num : INT     # intNum
     | DEC     # decNum
     ;
 
+ADD_ASSIGN : '+=' ;
+SUB_ASSIGN : '-=' ;
+MUL_ASSIGN : '*=' ;
+DIV_ASSIGN : '/=' ;
+
+INC : '++'  ;
 ADD : '+'   ;
+DECR : '--' ;
 SUB : '-'   ;
 MUL : '*'   ;
 DIV : '/'   ;
@@ -54,6 +67,7 @@ NOT : 'not' ;
 AND : 'and' ;
 OR  : 'or'  ;
 
+QUESTION  : '?' ;
 CONCAT : ':' ;
 TOSTR  : 'toStr' ;
 

@@ -1,0 +1,24 @@
+string nome = "edoardo";
+int voto = 27;
+bool lode = false;
+
+print "studente: " : nome;
+print "voto: " : toStr(voto);
+
+if (voto >= 18 and voto < 31) {
+    print "esame superato"
+} else {
+    print "voto non valido o insufficiente"
+};
+
+if (voto == 30 and lode) {
+    print "30 e lode"
+} else {
+    print "senza lode"
+}
+
+// OUTPUT ATTESO
+// studente: edoardo
+// voto: 27
+// esame superato
+// senza lode

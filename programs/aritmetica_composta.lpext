@@ -1,0 +1,28 @@
+int x = 10;
+int y = 3;
+
+print "somma: ";
+print toStr(${x + y});
+
+print "potenza: ";
+print toStr(${x ^ 2});
+
+x += 5;
+x *= 2;
+x -= 4;
+
+print "valore finale:";
+print toStr(x);
+
+string msg = "risultato = ";
+
+print msg : toStr(x)
+
+// OUTPUT ATTESO
+// somma:
+// 13
+// potenza:
+// 100
+// valore finale:
+// 26
+// risultato = 26

@@ -1,0 +1,24 @@
+int i = 1;
+int somma = 0;
+
+while (i <= 5) {
+
+    somma = somma + i;
+    i++
+
+};
+
+print "somma:";
+print toStr(somma);
+
+string esito =
+    somma > 10
+    ? "somma maggiore di 10"
+    : "somma minore o uguale a 10";
+
+print esito
+
+// OUTPUT ATTESO
+// somma:
+// 15
+// somma maggiore di 10

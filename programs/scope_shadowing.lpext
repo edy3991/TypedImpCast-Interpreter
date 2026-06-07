@@ -1,0 +1,28 @@
+int x = 10;
+
+print "valore iniziale:";
+print toStr(x);
+
+if (x > 5) {
+
+    int x = 100;
+
+    print "x interna:";
+    print toStr(x)
+
+} else {
+
+    print "ramo else"
+
+};
+
+print "x esterna:";
+print toStr(x)
+
+// OUTPUT ATTESO
+//valore iniziale:
+//10
+//x interna:
+//100
+//x esterna:
+//10

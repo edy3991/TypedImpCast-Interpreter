@@ -4,12 +4,16 @@ import org.antlr.v4.runtime.CharStream;
 import org.antlr.v4.runtime.CharStreams;
 import org.antlr.v4.runtime.CommonTokenStream;
 import org.antlr.v4.runtime.tree.ParseTree;
+
+import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
+import java.io.IOException;
+
 public class MainTypedImpCast {
 
-    public static void main(String[] args) {
+    public static void main(String[] args) throws IOException {
 
         if (args.length == 0) {
             System.err.println("Usage: java MainTypedImpCast <file>");

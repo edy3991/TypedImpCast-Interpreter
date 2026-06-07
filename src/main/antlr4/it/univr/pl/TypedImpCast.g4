@@ -1,8 +1,5 @@
 grammar TypedImpCast;
 
-@header {
-package it.univr.pl;
-}
 
 main : com EOF ;
 

@@ -376,6 +376,7 @@ public class TypedImpCastTS extends TypedImpCastBaseVisitor<Type> {
         return base.isCompatible(exponent) ? base : exponent;
     }
 
+    //controlla il tipo della variabile che sia int o dec
     @Override
     public ComType visitPostInc(TypedImpCastParser.PostIncContext ctx) {
         ExpType type = lookup(ctx.ID().getText());
@@ -387,6 +388,7 @@ public class TypedImpCastTS extends TypedImpCastBaseVisitor<Type> {
         return ComType.INSTANCE;
     }
 
+    //controlla il tipo della variabile che sia int o dec
     @Override
     public ComType visitPreInc(TypedImpCastParser.PreIncContext ctx) {
         ExpType type = lookup(ctx.ID().getText());
@@ -398,6 +400,7 @@ public class TypedImpCastTS extends TypedImpCastBaseVisitor<Type> {
         return ComType.INSTANCE;
     }
 
+    //controlla il tipo della variabile che sia int o dec
     @Override
     public ComType visitPostDecr(TypedImpCastParser.PostDecrContext ctx) {
         ExpType type = lookup(ctx.ID().getText());
@@ -409,6 +412,7 @@ public class TypedImpCastTS extends TypedImpCastBaseVisitor<Type> {
         return ComType.INSTANCE;
     }
 
+    //controlla il tipo della variabile che sia int o dec
     @Override
     public ComType visitPreDecr(TypedImpCastParser.PreDecrContext ctx) {
         ExpType type = lookup(ctx.ID().getText());
@@ -420,12 +424,13 @@ public class TypedImpCastTS extends TypedImpCastBaseVisitor<Type> {
         return ComType.INSTANCE;
     }
 
+
     @Override
     public ComType visitCompAssign(TypedImpCastParser.CompAssignContext ctx) {
-        String id = ctx.ID().getText();
+        String id = ctx.ID().getText(); // prende la variabile a sinistra
 
-        ExpType varType = lookup(ctx.ID().getText());
-        ExpType expType = (ExpType) visit(ctx.exp());
+        ExpType varType = lookup(ctx.ID().getText()); // controlla il tipo della variabile a sinistra
+        ExpType expType = (ExpType) visit(ctx.exp()); // risolve la parte di destra
 
         if ((!varType.isCompatible(SimpleType.INT) && !varType.isCompatible(SimpleType.DEC)) ||
                 (!expType.isCompatible(SimpleType.INT) && !expType.isCompatible(SimpleType.DEC))) {
@@ -441,7 +446,7 @@ public class TypedImpCastTS extends TypedImpCastBaseVisitor<Type> {
 
     @Override
     public ExpType visitTernary(TypedImpCastParser.TernaryContext ctx) {
-        visitBoolExp(ctx.exp(0));
+        visitBoolExp(ctx.exp(0)); // prende il primo nodo del parse tree
 
         ExpType trueType = (ExpType) visit(ctx.exp(1));
         ExpType falseType = (ExpType) visit(ctx.exp(2));
@@ -455,6 +460,8 @@ public class TypedImpCastTS extends TypedImpCastBaseVisitor<Type> {
 
     @Override
     public ComType visitMain(TypedImpCastParser.MainContext ctx) {
+
+        // salva tutte le funzioni dichiarate nel programma in una mappa
         for (TypedImpCastParser.FunDeclContext f : ctx.funDecl()) {
             String name = f.ID().getText();
 
@@ -465,22 +472,27 @@ public class TypedImpCastTS extends TypedImpCastBaseVisitor<Type> {
             functions.put(name, f);
         }
 
+        // controlla semanticamente che le funzioni siano scritte in modo corretto
         for (TypedImpCastParser.FunDeclContext f : ctx.funDecl()) {
             visitFunDecl(f);
         }
 
-        currentReturnType = null;
-        return visitCom(ctx.com());
+        currentReturnType = null; // al di fuori delle funzioni non si aspetta alcun ritorno
+        return visitCom(ctx.com()); // analizza il main alla fine
     }
 
     @Override
     public Type visitFunDecl(TypedImpCastParser.FunDeclContext ctx) {
+        // salva il tipo di ritorno per ripristinarlo quando si esce dalla funzione
         ExpType oldReturnType = currentReturnType;
 
+        // imposta il tipo di ritorno atteso della funzione corrente
         currentReturnType = TypeUtils.fromString(ctx.TYPE().getText());
 
+        // crea un nuovo scope locale nella funzione
         enterScope();
 
+        // inserisce i parametri formali nell'ambiente locale della funzione
         if (ctx.params() != null) {
             for (TypedImpCastParser.ParamContext p : ctx.params().param()) {
                 ExpType paramType = TypeUtils.fromString(p.TYPE().getText());
@@ -496,16 +508,19 @@ public class TypedImpCastTS extends TypedImpCastBaseVisitor<Type> {
             }
         }
 
+        // analizza semanticamente il corpo della funzione
         visitCom(ctx.com());
 
+        // rimuove lo scope locale
         exitScope();
 
+        // ripristina il tipo di ritorno precedente
         currentReturnType = oldReturnType;
 
         return ComType.INSTANCE;
     }
 
-
+    // calcola l'espressione del return e verifica che sia compatibile con la firma della funzione
     @Override
     public ComType visitReturn(TypedImpCastParser.ReturnContext ctx) {
         if (currentReturnType == null) {
@@ -524,34 +539,42 @@ public class TypedImpCastTS extends TypedImpCastBaseVisitor<Type> {
 
     @Override
     public ExpType visitFunCall(TypedImpCastParser.FunCallContext ctx) {
+        // recupera il nome della funzione chiamata
         String name = ctx.ID().getText();
 
+        // controlla che la funzione chiamata sia dichiarata
         if (!functions.containsKey(name)) {
             throw new RuntimeException("Function " + name + " not declared.");
         }
 
+        // recupera dalla mappa la dichiarazione della funzione
         TypedImpCastParser.FunDeclContext fun = functions.get(name);
 
+        // calcola il numero di parametri attesi e il numero di parametri passati
         int expectedArgs = fun.params() == null ? 0 : fun.params().param().size();
         int actualArgs = ctx.args() == null ? 0 : ctx.args().exp().size();
 
+        // controlla che il numero di argomenti coincida
         if (expectedArgs != actualArgs) {
             throw new RuntimeException("Function " + name + " expects "
                     + expectedArgs + " arguments but found " + actualArgs + ".");
         }
 
+        // controlla uno per uno gli argomenti della chiamata
         for (int i = 0; i < expectedArgs; i++) {
             TypedImpCastParser.ParamContext param = fun.params().param(i);
 
             ExpType expectedType = TypeUtils.fromString(param.TYPE().getText());
             ExpType actualType = (ExpType) visit(ctx.args().exp(i));
 
+            // controlla che il tipo atteso e il tipo effettivo degli argomenti coincidano
             if (!actualType.equals(expectedType)) {
                 throw new RuntimeException("Invalid argument type in function "
                         + name + ". Expected " + expectedType
                         + " but found " + actualType + ".");
             }
 
+            // caso in cui l'argomento viene passato per riferimento, deve essere una variabile e non un'espressione generica
             if (param.paramMode().REF() != null) {
                 if (!(ctx.args().exp(i) instanceof TypedImpCastParser.IdContext)) {
                     throw new RuntimeException("Reference parameter requires a variable.");
@@ -559,6 +582,7 @@ public class TypedImpCastTS extends TypedImpCastBaseVisitor<Type> {
             }
         }
 
+        // il tipo della chiamata è il tipo di ritorno dichiarato dalla funzione
         return TypeUtils.fromString(fun.TYPE().getText());
     }
 }

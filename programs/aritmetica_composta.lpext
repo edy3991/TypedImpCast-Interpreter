@@ -1,11 +1,12 @@
+main {
 int x = 10;
 int y = 3;
 
 print "somma: ";
-print toStr(${x + y});
+print toStr("${x + true}");
 
 print "potenza: ";
-print toStr(${x ^ 2});
+print toStr("${x ^ 2}");
 
 x += 5;
 x *= 2;
@@ -17,4 +18,4 @@ print toStr(x);
 string msg = "risultato = ";
 
 print msg : toStr(x)
-
+}

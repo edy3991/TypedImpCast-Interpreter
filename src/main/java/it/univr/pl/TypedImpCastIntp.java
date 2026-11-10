@@ -344,9 +344,12 @@ public class TypedImpCastIntp extends TypedImpCastBaseVisitor<Value> {
 
     @Override
     public ComValue visitPostInc(TypedImpCastParser.PostIncContext ctx) {
+        // recupera il nome della variabile da incrementare
         String id = ctx.ID().getText();
 
+        // legge il valore corrente della variabile
         IntValue oldValue =  (IntValue) mem.getValue(id);
+        // aggiorna il valore della variabile incrementando di 1
         mem.updateValue(id, new IntValue(oldValue.toJavaValue() + 1));
 
         return ComValue.INSTANCE;
@@ -354,9 +357,12 @@ public class TypedImpCastIntp extends TypedImpCastBaseVisitor<Value> {
 
     @Override
     public ComValue visitPreInc(TypedImpCastParser.PreIncContext ctx) {
+        // recupera il nome della variabile da incrementare
         String id = ctx.ID().getText();
 
+        // legge il valore corrente della variabile
         IntValue oldValue =  (IntValue) mem.getValue(id);
+        // aggiorna il valore della variabile incrementando di 1
         mem.updateValue(id, new IntValue(oldValue.toJavaValue() + 1));
 
         return ComValue.INSTANCE;
@@ -364,9 +370,12 @@ public class TypedImpCastIntp extends TypedImpCastBaseVisitor<Value> {
 
     @Override
     public ComValue visitPreDecr(TypedImpCastParser.PreDecrContext ctx) {
+        // recupera il nome della variabile da decrementare
         String id = ctx.ID().getText();
-        IntValue oldValue =  (IntValue) mem.getValue(id);
 
+        // legge il valore corrente della variabile
+        IntValue oldValue =  (IntValue) mem.getValue(id);
+        // aggiorna il valore della variabile decrementato di 1
         mem.updateValue(id, new IntValue(oldValue.toJavaValue() - 1));
 
         return ComValue.INSTANCE;
@@ -374,9 +383,12 @@ public class TypedImpCastIntp extends TypedImpCastBaseVisitor<Value> {
 
     @Override
     public ComValue visitPostDecr(TypedImpCastParser.PostDecrContext ctx) {
+        // recupera il nome della variabile da decrementare
         String id = ctx.ID().getText();
-        IntValue oldValue =  (IntValue) mem.getValue(id);
 
+        // legge il valore corrente della variabile
+        IntValue oldValue =  (IntValue) mem.getValue(id);
+        // aggiorna il valore della variabile decrementato di 1
         mem.updateValue(id, new IntValue(oldValue.toJavaValue() - 1));
 
         return ComValue.INSTANCE;
@@ -384,13 +396,17 @@ public class TypedImpCastIntp extends TypedImpCastBaseVisitor<Value> {
 
     @Override
     public ComValue visitCompAssign(TypedImpCastParser.CompAssignContext ctx) {
+        // recupera il nome della variabile
         String id = ctx.ID().getText();
 
+        // legge il valore della variabile a sinistra
         NumValue<?> left = (NumValue<?>) mem.getValue(id);
+        // legge il valore della variabile a destra
         NumValue<?> right = visitNumExp(ctx.exp());
 
         double result;
 
+        // in base al tipo di operatore viene eseguita l'operazione
         switch (ctx.op.getType()) {
             case TypedImpCastParser.ADD_ASSIGN ->
                     result = left.toJavaValue().doubleValue() + right.toJavaValue().doubleValue();
@@ -407,6 +423,7 @@ public class TypedImpCastIntp extends TypedImpCastBaseVisitor<Value> {
             default -> throw new RuntimeException("Unknown compound assignment operator.");
         }
 
+        // aggiorna il valore della variabile mantenendo il tipo int se possibile
         if (left instanceof IntValue && right instanceof IntValue && ctx.op.getType() != TypedImpCastParser.DIV_ASSIGN) {
             mem.updateValue(id, new IntValue((int) result));
         } else {
@@ -418,17 +435,21 @@ public class TypedImpCastIntp extends TypedImpCastBaseVisitor<Value> {
 
     @Override
     public ExpValue<?> visitTernary(TypedImpCastParser.TernaryContext ctx) {
+        // valuta la condizione del ternario
         BoolValue condition = visitBoolExp(ctx.exp(0));
 
+        // se è vera restituisce il valore della prima espressione
         if(condition.toJavaValue()) {
             return visitExp(ctx.exp(1));
         }
 
+        // se è falsa restituisce il valore della seconda espressione
         return visitExp(ctx.exp(2));
     }
 
     @Override
     public ComValue visitMain(TypedImpCastParser.MainContext ctx) {
+        // vengono solo registrate le funzioni nella mappa, non eseguite
         for (TypedImpCastParser.FunDeclContext f : ctx.funDecl()) {
             String name = f.ID().getText();
 
@@ -438,9 +459,11 @@ public class TypedImpCastIntp extends TypedImpCastBaseVisitor<Value> {
 
             functions.put(name, f);
         }
+        // una volta salvate, viene eseguito il blocco main
         return visitCom(ctx.com());
     }
 
+    // interrompe l'esecuzione della funzione e propaga il valore di ritorno fino alla funzione chiamante
     private static class ReturnException extends RuntimeException {
         private final ExpValue<?> value;
 
@@ -453,6 +476,7 @@ public class TypedImpCastIntp extends TypedImpCastBaseVisitor<Value> {
         }
     }
 
+    // valuta l'espressione dopo il return e lancia una return exception
     @Override
     public ComValue visitReturn(TypedImpCastParser.ReturnContext ctx) {
         throw new ReturnException(visitExp(ctx.exp()));
@@ -461,31 +485,39 @@ public class TypedImpCastIntp extends TypedImpCastBaseVisitor<Value> {
 
     @Override
     public ExpValue<?> visitFunCall(TypedImpCastParser.FunCallContext ctx) {
+        // recupera il nome della funzione
         String name = ctx.ID().getText();
 
+        // controlla che la funzione esista nella mappa delle funzioni
         if (!functions.containsKey(name)) {
             throw new RuntimeException("Function " + name + " not declared.");
         }
 
+        // recupera la dichiarazione delle funzioni
         TypedImpCastParser.FunDeclContext fun = functions.get(name);
 
+        // calcola il numero di parametro attesi
         int expectedArgs = fun.params() == null ? 0 : fun.params().param().size();
         int actualArgs = ctx.args() == null ? 0 : ctx.args().exp().size();
 
+        // controlla che siano uguali, in termini di quantità
         if (expectedArgs != actualArgs) {
             throw new RuntimeException("Function " + name + " expects "
                     + expectedArgs + " arguments but found " + actualArgs + ".");
         }
 
+        // passaggio per valore
         ExpValue<?>[] argValues = new ExpValue<?>[actualArgs];
+        // associazione per il passaggio di riferimento
         Map<String, String> refBindings = new HashMap<>();
 
-        // 1. Valuta gli argomenti PRIMA del nuovo scope
+        // valuta gli argomenti PRIMA del nuovo scope, quindi guarda nello scope attuale
         for (int i = 0; i < actualArgs; i++) {
             argValues[i] = visitExp(ctx.args().exp(i));
 
             TypedImpCastParser.ParamContext param = fun.params().param(i);
 
+            // se il parametro è ref, l'argomento deve essere una variabile
             if (param.paramMode().REF() != null) {
                 TypedImpCastParser.ExpContext arg = ctx.args().exp(i);
 
@@ -500,9 +532,10 @@ public class TypedImpCastIntp extends TypedImpCastBaseVisitor<Value> {
             }
         }
 
-        // 2. Ora crea lo scope della funzione
+        // ora crea lo scope della funzione
         mem.enterScope();
 
+        // inserisce i parametri formali nello scope della funzione e li inizializza con i valori degli argomenti
         try {
             for (int i = 0; i < expectedArgs; i++) {
                 TypedImpCastParser.ParamContext param = fun.params().param(i);
@@ -514,21 +547,26 @@ public class TypedImpCastIntp extends TypedImpCastBaseVisitor<Value> {
                 mem.updateValue(paramName, argValues[i]);
             }
 
+            // esegue il corpo della funzione, il corpo deve terminare con un return
             visitCom(fun.com());
 
+            // errore se non termina con un return
             throw new RuntimeException("Function " + name + " ended without return.");
 
         } catch (ReturnException re) {
 
+            // aggiorna i valori dei parametri passati come riferimento
             for (String paramName : refBindings.keySet()) {
                 String originalName = refBindings.get(paramName);
                 ExpValue<?> finalValue = mem.getValue(paramName);
                 mem.updateValue(originalName, finalValue);
             }
 
+            // il valore della return exception diventa il valore della chiamata di funzione
             return re.getValue();
 
         } finally {
+            // rimuove lo scope della funzione
             mem.exitScope();
         }
     }

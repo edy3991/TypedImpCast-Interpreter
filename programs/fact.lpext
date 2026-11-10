@@ -1,0 +1,11 @@
+fun int fact(val int n) {
+    if (n == 0) {
+        return 1
+    } else {
+        return n * fact(n - 1)
+    }
+}
+
+main {
+    print toStr(fact(5))
+}

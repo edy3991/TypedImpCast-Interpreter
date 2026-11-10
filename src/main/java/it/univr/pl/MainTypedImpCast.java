@@ -15,6 +15,7 @@ public class MainTypedImpCast {
 
     public static void main(String[] args) throws IOException {
 
+        // se non si passa come argomento un file .lpext allora darà errore e ti spiega come farlo funzionare
         if (args.length == 0) {
             System.err.println("Usage: java MainTypedImpCast <file>");
             return;

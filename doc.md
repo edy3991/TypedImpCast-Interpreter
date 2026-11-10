@@ -22,6 +22,7 @@ Il linguaggio include inoltre costrutti tipici dei linguaggi imperativi moderni,
 * operatori di incremento e decremento pre e postfissi;
 * assegnamenti composti (`+=`, `-=`, `*=`, `/=`);
 * operatore condizionale ternario.
+* funzioni e funzioni ricorsive
 
 L'implementazione è basata sul framework ANTLR4 per la generazione automatica di lexer e parser. L'analisi statica viene effettuata mediante un visitor dedicato al controllo dei tipi, mentre l'esecuzione dei programmi è affidata ad un secondo visitor che implementa la semantica operazionale del linguaggio.
 
@@ -37,15 +38,24 @@ Per compilare ed eseguire il progetto sono necessari:
 
 ## Compilazione
 
-Per compilare il progetto ed eseguire la generazione del lexer e del parser ANTLR, bisogna premere col tasto destro sul file .g4 e selezionare l'opzione 'Generate ANTLR Recognizer'
+Per compilare il progetto ed eseguire la generazione del lexer e del parser ANTLR, bisogna scrivere sul terminale di IntelliJ
+
+```text
+mvn clean compile
+```
 
 ## Esecuzione
 
-I programmi vengono attualmente definiti all'interno della classe `TypedImpCastIntpTest` mediante una stringa contenente il codice sorgente del linguaggio.
+Per eseguire un programma è sufficiente scrivere:
 
-Per eseguire un programma è sufficiente modificare il contenuto della variabile che rappresenta il programma e avviare la classe di test.
+```text
+mvn exec:java -Dexec.mainClass="it.univr.pl.MainTypedImpCast" -Dexec.args="programs/NOME_PROGRAMMA.lpext"
+```
+Se il programma non è nel formato .lpext allora non viene accettato e darà errore.
 
-
+```text
+Expected .lpext file
+```
 ## Primo Programma
 
 ```text
@@ -80,15 +90,16 @@ string
 I principali comandi supportati sono:
 
 ```text
-TYPE ID = exp        dichiarazione con inizializzazione
-TYPE ID              dichiarazione senza inizializzazione
-ID = exp             assegnamento
-print exp            stampa
-if (exp) { com }     condizionale
-if (exp) { com } else { com }
-while (exp) { com }  ciclo
-nop                  comando vuoto
-com ; com            sequenza di comandi
+TYPE ID = exp        | dichiarazione con inizializzazione
+TYPE ID              | dichiarazione senza inizializzazione
+ID = exp             | assegnamento
+print exp            | stampa
+if (exp) { com }     | condizionale
+if (exp) { com } else { com } 
+while (exp) { com }  | ciclo
+nop                  | comando vuoto
+com ; com            | sequenza di comandi
+return               | ritorno di una funzione
 ```
 
 ## Espressioni
@@ -107,6 +118,7 @@ cast espliciti
 toStr(exp)
 concatenazione di stringhe
 operatore ternario cond ? exp1 : exp2
+funzioni
 ```
 
 ## Zucchero sintattico
@@ -142,7 +154,7 @@ Il linguaggio supporta inoltre espressioni all’interno delle stringhe tramite 
 
 ## Funzioni
 
-TypedImpCastExt supporta la definizione e la chiamata di funzioni con parametri e valore di ritorno. Le funzioni sono dichiarate prima del blocco `main` in una sezione non eseguibile del programma.
+TypedImpCastExt supporta la definizione e la chiamata di funzioni con parametri e valore di ritorno obbligatorio. Le funzioni sono dichiarate prima del blocco `main` in una sezione non eseguibile del programma.
 
 La sintassi generale è:
 
@@ -165,7 +177,7 @@ ref TYPE x
 
 Il passaggio per valore crea una copia del valore passato alla funzione. Le modifiche al parametro formale non modificano la variabile originale.
 
-Il passaggio per riferimento permette invece alla funzione di modificare direttamente la variabile passata come argomento. Concettualmente è simile all’uso di un riferimento o puntatore: il parametro formale diventa collegato alla variabile originale.
+Il passaggio per riferimento permette invece alla funzione di modificare direttamente la variabile passata come argomento. Concettualmente è simile all’uso di un puntatore: il parametro formale diventa collegato alla variabile originale.
 
 Esempio:
 
@@ -390,25 +402,6 @@ Quando viene incontrata una chiamata di funzione, l’interprete recupera la def
 Il comando `return` è stato implementato tramite un’eccezione interna. Quando l’interprete incontra un `return`, lancia un’eccezione contenente il valore restituito. In questo modo l’esecuzione del corpo della funzione viene interrotta immediatamente e il valore viene riportato al punto della chiamata.
 
 Per il passaggio per riferimento, l’interprete mantiene un collegamento tra il parametro formale e la variabile originale passata come argomento. Alla fine della chiamata, il valore finale del parametro viene copiato nella variabile originale. In questo modo una funzione può modificare una variabile dichiarata dal chiamante.
-
-$$
-\text{Seq}\;
-\frac{
-(\sigma, com_1) \rightarrow (\sigma', com_1')
-}{
-(\sigma, com_1 ; com_2) \rightarrow (\sigma', com_1' ; com_2)
-}
-$$
-
-$$
-\text{FunCall}\;
-\frac{
-f \mapsto (params, body, ret) \quad
-\sigma' = bind(params, args, \sigma)
-}{
-(\sigma, f(args)) \rightarrow eval(body, \sigma')
-}
-$$
 
 # Programmi di Test
 

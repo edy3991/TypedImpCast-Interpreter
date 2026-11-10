@@ -1,0 +1,20 @@
+fun int cambiav(val int x) {
+    x = 100;
+    return x
+}
+
+
+fun int cambiar(ref int x) {
+    x = 100;
+    return x
+}
+
+main {
+    int a = 5;
+    print toStr(cambiav(a));
+    print toStr(a);
+
+    int b = 9;
+    print toStr(cambiar(b));
+    print toStr(b)
+}
